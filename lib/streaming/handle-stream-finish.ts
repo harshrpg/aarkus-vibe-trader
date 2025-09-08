@@ -13,7 +13,7 @@ interface HandleStreamFinishParams {
   userId: string
   skipRelatedQuestions?: boolean
   annotations?: ExtendedCoreMessage[]
-  advancedChatEnabled?: boolean,
+  advancedChatEnabled: boolean,
   advancedChatSymbol: string
 }
 
