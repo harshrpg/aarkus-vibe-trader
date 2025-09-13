@@ -35,9 +35,11 @@ export async function updateSession(request: NextRequest) {
 
   // IMPORTANT: DO NOT REMOVE auth.getUser()
 
+  console.log('[auth][middleware] getUser: start')
   const {
     data: { user }
   } = await supabase.auth.getUser()
+  console.log('[auth][middleware] getUser: result', { hasUser: !!user })
 
   // Define public paths that don't require authentication
   const publicPaths = [

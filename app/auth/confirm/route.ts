@@ -11,11 +11,12 @@ export async function GET(request: NextRequest) {
 
   if (token_hash && type) {
     const supabase = await createClient()
-
+    console.log('[auth][confirm-route] verifyOtp: start', { hasTokenHash: !!token_hash, type })
     const { error } = await supabase.auth.verifyOtp({
       type,
       token_hash,
     })
+    console.log('[auth][confirm-route] verifyOtp: result', { hasError: !!error })
     if (!error) {
       // redirect user to specified redirect URL or root of app
       redirect(next)

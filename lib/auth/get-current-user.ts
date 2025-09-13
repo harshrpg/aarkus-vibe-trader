@@ -9,7 +9,9 @@ export async function getCurrentUser() {
   }
 
   const supabase = await createClient()
+  console.log('[auth][get-current-user] getUser: start')
   const { data } = await supabase.auth.getUser()
+  console.log('[auth][get-current-user] getUser: result', { hasUser: !!data.user })
   return data.user ?? null
 }
 

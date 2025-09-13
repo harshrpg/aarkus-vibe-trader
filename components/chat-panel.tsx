@@ -143,20 +143,20 @@ export function ChatPanel({
     dispatch(set(advancedModeValue));
 
     // Persist the advanced settings for this chat in Redis
-    if (chatId) {
-      const payload = {
-        chatId,
-        advancedChatEnabled: advancedEnabled,
-        advancedChatSymbol: advancedSymbol
-      }
-      fetch('/api/chat/preferences', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      }).catch(() => {
-        // Silently ignore persistence errors on the client
-      })
-    }
+    // if (chatId) {
+    //   const payload = {
+    //     chatId,
+    //     advancedChatEnabled: advancedEnabled,
+    //     advancedChatSymbol: advancedSymbol
+    //   }
+    //   fetch('/api/chat/preferences', {
+    //     method: 'POST',
+    //     headers: { 'Content-Type': 'application/json' },
+    //     body: JSON.stringify(payload)
+    //   }).catch(() => {
+    //     // Silently ignore persistence errors on the client
+    //   })
+    // }
   }, [advancedEnabled, advancedSymbol])
 
   // Scroll to the bottom of the container

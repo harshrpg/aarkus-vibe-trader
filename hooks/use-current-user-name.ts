@@ -6,7 +6,9 @@ export const useCurrentUserName = () => {
 
   useEffect(() => {
     const fetchProfileName = async () => {
+      console.log('[auth][hook][use-current-user-name] getSession: start')
       const { data, error } = await createClient().auth.getSession()
+      console.log('[auth][hook][use-current-user-name] getSession: result', { hasError: !!error, hasSession: !!data.session })
       if (error) {
         console.error(error)
       }

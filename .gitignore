@@ -37,3 +37,6 @@ next-env.d.ts
 
 # cursor
 .cursor/rules/private
+
+.env.local
+.env.production

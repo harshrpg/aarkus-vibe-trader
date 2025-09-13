@@ -55,9 +55,13 @@ export default async function RootLayout({
 
   if (supabaseUrl && supabaseAnonKey) {
     const supabase = await createClient()
+    console.log('[auth][layout] getUser: start')
     const {
       data: { user: supabaseUser }
     } = await supabase.auth.getUser()
+    console.log('[auth][layout] getUser: result', {
+      hasUser: !!supabaseUser
+    })
     user = supabaseUser
   }
 

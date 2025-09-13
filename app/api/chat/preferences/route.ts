@@ -9,15 +9,17 @@ export async function POST(req: Request) {
         }
 
         const redis = await getRedisClient()
-        const pipeline = redis.pipeline()
+        // Ensure we only update preferences on existing chats to avoid creating partial hashes
+        const existing = await redis.hgetall<Record<string, any>>(`chat:${chatId}`)
+        if (!existing || Object.keys(existing).length === 0) {
+            return new Response('Chat not found', { status: 404 })
+        }
 
-        // Store as simple fields on chat hash. Upserts if hash does not exist yet.
+        const pipeline = redis.pipeline()
         pipeline.hmset(`chat:${chatId}`, {
-            id: chatId,
             advancedChatEnabled: String(advancedChatEnabled),
             advancedChatSymbol: String(advancedChatSymbol)
         })
-
         await pipeline.exec()
 
         return new Response('OK')

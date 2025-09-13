@@ -34,10 +34,12 @@ export function LoginForm({
     setError(null)
 
     try {
+      console.log('[auth][login-form] signInWithPassword: start', { hasEmail: !!email })
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password
       })
+      console.log('[auth][login-form] signInWithPassword: result', { hasError: !!error })
       if (error) throw error
       // Redirect to root and refresh to ensure server components get updated session
       router.push('/')
@@ -55,12 +57,14 @@ export function LoginForm({
     setError(null)
 
     try {
+      console.log('[auth][login-form] signInWithOAuth: start')
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: `${location.origin}/auth/oauth`
         }
       })
+      console.log('[auth][login-form] signInWithOAuth: result', { hasError: !!error })
       if (error) throw error
     } catch (error: unknown) {
       setError(

@@ -115,7 +115,7 @@ export function ChatMenuItem({ chat }: ChatMenuItemProps) {
         isActive={isActive}
         className="h-auto flex-col gap-0.5 items-start p-2 pr-8"
       >
-        <Link href={chat.path}>
+        <Link href={typeof chat.path === 'string' && chat.path ? chat.path : '/'}>
           <div className="text-xs font-medium truncate select-none w-full">
             {chat.title}
           </div>

@@ -31,7 +31,9 @@ export function UpdatePasswordForm({
     setError(null)
 
     try {
+      console.log('[auth][update-password-form] updateUser: start')
       const { error } = await supabase.auth.updateUser({ password })
+      console.log('[auth][update-password-form] updateUser: result', { hasError: !!error })
       if (error) throw error
       // Redirect to root and refresh to ensure server components get updated session.
       router.push('/')
