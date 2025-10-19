@@ -9,6 +9,7 @@ import { Spinner } from './ui/spinner'
 import * as Tabs from '@radix-ui/react-tabs'
 import dynamic from 'next/dynamic'
 import { useAppSelector } from '@/lib/store/hooks'
+import { addMACD } from '@/lib/tv/bridge'
 // Import section structure interface
 interface ChatSection {
   id: string

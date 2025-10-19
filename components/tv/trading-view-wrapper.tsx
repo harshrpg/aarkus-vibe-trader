@@ -2,7 +2,9 @@
 
 import { useAppSelector } from "@/lib/store/hooks";
 import Datafeed from "@/lib/tradingview/datafeed";
+import { registerWidget } from "@/lib/tv/bridge";
 import { loadScript, loadCSS } from "@/lib/tv/utils";
+import { IChartingLibraryWidget, IChartWidgetApi } from "@/public/charting_library/charting_library";
 import { useEffect, useRef, useState } from "react";
 
 // Global state to track script loading
@@ -17,7 +19,7 @@ const TradingViewWrapper = () => {
 
     useEffect(() => {
         let isMounted = true;
-        let widget: any = null;
+        let widget: IChartingLibraryWidget | null = null;
 
         const loadScripts = async () => {
             if (scriptsLoaded) {
@@ -83,6 +85,14 @@ const TradingViewWrapper = () => {
                         // Load custom CSS
                         custom_css_url: '/charting_library/themed.css',
                         datafeed: Datafeed
+                    });
+                    widget?.onChartReady(() => {
+                        // alert('Chart Ready')
+                        console.log('[trading-view-wrapper] On Chart Ready');
+                        console.debug('[trading-view-wrapper] On Chart Ready::Registering widget with app');
+                        registerWidget(widget as IChartingLibraryWidget);
+                        // const chart: IChartWidgetApi | undefined = widget?.activeChart();
+                        // chart?.createStudy('MACD', false, false, { in_0: 14, in_1: 30, in_3: 'close', in_2: 9 });
                     });
 
                     console.log('[trading-view-wrapper] Widget Initialized successfully');

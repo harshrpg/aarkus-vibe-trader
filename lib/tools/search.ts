@@ -1,6 +1,7 @@
 import { getSearchSchemaForModel } from '@/lib/schema/search'
 import { SearchResults } from '@/lib/types'
-import { getBaseUrlString } from '@/lib/utils/url'
+// Import server version for server paths. Client code should not bundle this file directly.
+import { getBaseUrlString } from '@/lib/utils/url.server'
 import { tool } from 'ai'
 import { DEFAULT_PROVIDER, SearchProviderType, createSearchProvider } from './search/providers'
 
@@ -34,7 +35,7 @@ export function createSearchTool(fullModel: string) {
 
       const effectiveSearchDepthForAPI =
         searchAPI === 'searxng' &&
-        process.env.SEARXNG_DEFAULT_DEPTH === 'advanced'
+          process.env.SEARXNG_DEFAULT_DEPTH === 'advanced'
           ? 'advanced'
           : effectiveSearchDepth || 'basic'
 
@@ -49,7 +50,7 @@ export function createSearchTool(fullModel: string) {
         ) {
           // Get the base URL using the centralized utility function
           const baseUrl = await getBaseUrlString()
-          
+
           const response = await fetch(`${baseUrl}/api/advanced-search`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

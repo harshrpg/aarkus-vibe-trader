@@ -21,6 +21,7 @@ import { setCookie } from '@/lib/utils/cookies'
 import { useAppDispatch } from '@/lib/store/hooks'
 import { set } from '@/features/advanced-mode/advancedModeSlice'
 import { AdvancedModeState } from '@/types/chatInput'
+import { addMACD } from '@/lib/tv/bridge'
 
 interface ChatPanelProps {
   input: string
@@ -170,6 +171,11 @@ export function ChatPanel({
     }
   }
 
+  const testAddingMacdOnWebsite = async () => {
+    console.log('[chat-panel] Adding Macd from button click');
+    await addMACD();
+  }
+
   return (
     <div
       className={cn(
@@ -289,6 +295,7 @@ export function ChatPanel({
                   >
                     {isLoading ? <Square size={20} /> : <ArrowUp size={20} />}
                   </Button>
+                  <Button onClick={() => testAddingMacdOnWebsite()}>Add Macd</Button>
                 </div>
               </div>
             </div>
