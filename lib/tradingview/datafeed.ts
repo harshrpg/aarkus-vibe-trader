@@ -42,25 +42,28 @@ async function getAllSymbols(): Promise<SymbolSearchItem[]> {
     const data = await makeApiRequest<AllExchangesResponse>('data/v3/all/exchanges');
     let allSymbols: SymbolSearchItem[] = [];
 
-    for (const exchange of configurationData.exchanges) {
-        const exchangeData = data.Data[exchange.value];
+    // Iterate ALL exchanges returned by the API (not only the small UI list)
+    const exchanges = Object.keys(data.Data || {});
+    for (const exchange of exchanges) {
+        const exchangeData = data.Data[exchange];
         if (!exchangeData) continue;
-        const pairs = exchangeData.pairs;
+        const pairs = exchangeData.pairs || {};
 
         for (const leftPairPart of Object.keys(pairs)) {
             const symbols: SymbolSearchItem[] = pairs[leftPairPart].map((rightPairPart: string) => {
-                const symbol = generateSymbol(exchange.value, leftPairPart, rightPairPart);
+                const symbol = generateSymbol(exchange, leftPairPart, rightPairPart);
                 return {
                     symbol: symbol.short,
-                    ticker: symbol.short,
+                    ticker: symbol.short, // TradingView resolves using this
                     description: symbol.short,
-                    exchange: exchange.value,
+                    exchange,
                     type: 'crypto',
                 };
             });
             allSymbols = [...allSymbols, ...symbols];
         }
     }
+
     return allSymbols;
 }
 
@@ -102,6 +105,7 @@ const Datafeed = {
         // Symbol information object
         const symbolInfo = {
             ticker: symbolItem.ticker,
+            full_name: symbolItem.ticker,
             name: symbolItem.symbol,
             description: symbolItem.description,
             type: symbolItem.type,
@@ -136,7 +140,7 @@ const Datafeed = {
             return;
         }
         const params = new URLSearchParams({
-            e: String(symbolInfo.exchange),
+            // Do not force exchange; let CryptoCompare aggregate (CCCAGG) for broader coverage
             fsym: parsedSymbol.fromSymbol,
             tsym: parsedSymbol.toSymbol,
             toTs: String(to),
@@ -146,13 +150,33 @@ const Datafeed = {
             interface HistDayBar { time: number; low: number; high: number; open: number; close: number }
             interface HistDayResponse { Response?: 'Success' | 'Error'; Data: HistDayBar[] }
             const data = await makeApiRequest<HistDayResponse>(`data/histoday?${params.toString()}`);
-            if ((data.Response && data.Response === 'Error') || data.Data.length === 0) {
+            let responseData = data;
+            // Fallback: if no data for USDT/USDC quote, try USD
+            if ((responseData.Response && responseData.Response === 'Error') || responseData.Data.length === 0) {
+                if (['USDT', 'USDC'].includes(parsedSymbol.toSymbol.toUpperCase())) {
+                    const fallbackParams = new URLSearchParams({
+                        fsym: parsedSymbol.fromSymbol,
+                        tsym: 'USD',
+                        toTs: String(to),
+                        limit: String(2000),
+                    });
+                    try {
+                        const fallback = await makeApiRequest<HistDayResponse>(`data/histoday?${fallbackParams.toString()}`);
+                        if (!fallback.Response || fallback.Response === 'Success') {
+                            responseData = fallback;
+                        }
+                    } catch (_) {
+                        // ignore fallback error
+                    }
+                }
+            }
+            if ((responseData.Response && responseData.Response === 'Error') || responseData.Data.length === 0) {
                 // "noData" should be set if there is no data in the requested period
                 onHistoryCallback([], { noData: true });
                 return;
             }
             const bars: Bar[] = [];
-            data.Data.forEach((bar) => {
+            responseData.Data.forEach((bar) => {
                 if (bar.time >= from && bar.time < to) {
                     bars.push({
                         time: bar.time * 1000, // convert to ms for TradingView
