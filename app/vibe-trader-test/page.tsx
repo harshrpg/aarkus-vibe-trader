@@ -13,7 +13,10 @@ import { Separator } from '@/components/ui/separator'
 import dynamic from 'next/dynamic'
 import { useAppDispatch } from '@/lib/store/hooks'
 import { set as setAdvancedMode } from '@/features/advanced-mode/advancedModeSlice'
-import { setSymbol as tvSetSymbol, ready as chartReady } from '@/lib/tv/bridge'
+import { setSymbol as tvSetSymbol, ready as chartReady, applyMultipleIndicators, clearAllIndicators } from '@/lib/tv/bridge'
+import { useChat } from '@ai-sdk/react'
+import { experimental_useObject as useObject } from '@ai-sdk/react'
+import { tradingAdviceSchema } from '@/lib/schema/trading-advice'
 import {
   Activity,
   BarChart3,
@@ -40,6 +43,105 @@ export default function VibeTraderTestPage() {
     timestamp: Date
     status: 'running' | 'completed' | 'error'
   }>>([])
+
+  // Chat state for sending analysis text to LLM via Vercel AI SDK
+  const { messages, append, status } = useChat({
+    id: 'vibe-trader-test',
+    initialMessages: [
+      {
+        id: 'sys-vibe-indicators',
+        role: 'system',
+        content:
+          'You are the Vibe Trader assistant. For every response, after your analysis, include a concise, machine-readable JSON object on a new line exactly in the form {"indicators":[{"type":"sma","params":{"length":50}}]}. Use these indicator types when appropriate: sma, ema, rsi, macd, bb, ichimoku, vwma, stoch. Choose 3-5 relevant indicators with sensible default params for the symbol/timeframe. Keep prose short.'
+      }
+    ],
+    onError: (error) => {
+      console.error('LLM chat error:', error)
+    },
+    experimental_throttle: 100
+  })
+
+  // Structured trading advice via useObject (Zod schema)
+  const { submit: submitAdvice, object: adviceObject, isLoading: isAdviceLoading, error: adviceError } = useObject({
+    api: '/api/trading-advice',
+    id: 'vibe-trader-advice',
+    schema: tradingAdviceSchema
+  })
+
+  // Log technical indicators from structured advice
+  useEffect(() => {
+    const indicators = adviceObject?.technical?.indicators
+    if (Array.isArray(indicators) && indicators.length > 0) {
+      console.log('Structured advice indicators:', indicators)
+    }
+  }, [adviceObject])
+
+  // Normalize indicator names/params from advice for TradingView studies
+  const normalizeIndicator = (ind: any) => {
+    const nameRaw = String(ind?.name || '').toLowerCase()
+    const params = (ind?.parameters || {}) as Record<string, any>
+    switch (nameRaw) {
+      case 'sma':
+        return { name: 'Moving Average', parameters: { length: params.length ?? 20 }, visible: true }
+      case 'ema':
+        return { name: 'Moving Average Exponential', parameters: { length: params.length ?? 20 }, visible: true }
+      case 'rsi':
+        return { name: 'Relative Strength Index', parameters: { length: params.length ?? 14 }, visible: true }
+      case 'macd':
+        return {
+          name: 'MACD',
+          parameters: {
+            in_0: params.fast ?? params.in_0 ?? 12,
+            in_1: params.slow ?? params.in_1 ?? 26,
+            in_2: params.signal ?? params.in_2 ?? 9,
+            in_3: params.source ?? params.in_3 ?? 'close'
+          },
+          visible: true
+        }
+      case 'bb':
+      case 'bollinger':
+      case 'bollinger_bands':
+        return { name: 'Bollinger Bands', parameters: { length: params.length ?? 20, mult: params.stdDev ?? params.mult ?? 2 }, visible: true }
+      case 'stoch':
+      case 'stochastic':
+        return { name: 'Stochastic', parameters: { k: params.k ?? 14, d: params.d ?? 3 }, visible: true }
+      case 'vwma':
+        return { name: 'VWMA', parameters: { length: params.length ?? 20 }, visible: true }
+      case 'ichimoku':
+      case 'ichimoku_cloud':
+        return { name: 'Ichimoku Cloud', parameters: params, visible: true }
+      default:
+        return { name: ind?.name ?? 'Moving Average', parameters: params, visible: true }
+    }
+  }
+
+  // Apply indicators to TradingView when structured advice arrives
+  useEffect(() => {
+    const indicators = adviceObject?.technical?.indicators
+    if (!Array.isArray(indicators) || indicators.length === 0) return
+
+      ; (async () => {
+        try {
+          await chartReady
+          // Clear any previous indicators for a clean state
+          await clearAllIndicators()
+          // Deduplicate by normalized study name
+          const seen = new Set<string>()
+          const configs = indicators
+            .map(normalizeIndicator)
+            .filter(cfg => {
+              if (seen.has(cfg.name)) return false
+              seen.add(cfg.name)
+              return true
+            })
+          await applyMultipleIndicators(configs)
+        } catch (e) {
+          console.error('Failed to apply indicators from advice:', e)
+        }
+      })()
+  }, [adviceObject])
+
+
 
   const {
     streamState,
@@ -111,6 +213,13 @@ export default function VibeTraderTestPage() {
     }])
 
     // Chart component will trigger streaming; we keep history updates here
+
+    // Also send the analysis text to the LLM via useChat
+    const content = `Symbol: ${symbol}\nRequest: ${query}`
+    append({ role: 'user', content })
+
+    // Request structured advice object
+    submitAdvice({ symbol, timeframe: '1D', query })
   }
 
   const handleStopAnalysis = () => {
@@ -310,9 +419,11 @@ export default function VibeTraderTestPage() {
             <VibeTraderStreamingChart
               symbol={currentSymbol}
               query={currentRequest}
+              applyIndicatorsFromStream={false}
               onChartReady={() => console.log('Chart ready for', currentSymbol)}
               onError={(error) => console.error('Chart error:', error)}
-              onComplete={() => {
+              onComplete={(result) => {
+                console.log('Analysis complete:', result)
                 setAnalysisHistory(prev => prev.map(item =>
                   item.symbol === currentSymbol && item.status === 'running'
                     ? { ...item, status: 'completed' }
@@ -321,6 +432,39 @@ export default function VibeTraderTestPage() {
               }}
             />
           )}
+
+          {/* LLM Response */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">LLM Response</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-xs text-muted-foreground mb-2">
+                {status === 'submitted' || status === 'streaming' ? 'Generating...' : 'Latest response'}
+              </div>
+              <div className="whitespace-pre-wrap text-sm">
+                {messages.filter(m => m.role === 'assistant').slice(-1)[0]?.content || 'No response yet'}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Structured Advice (useObject) */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Advice (structured)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {adviceError && (
+                <div className="text-sm text-red-600 dark:text-red-400 mb-2">{String(adviceError)}</div>
+              )}
+              <div className="text-xs text-muted-foreground mb-2">
+                {isAdviceLoading ? 'Generating structured advice...' : 'Top-level summary'}
+              </div>
+              <div className="whitespace-pre-wrap text-sm">
+                {adviceObject?.text || 'No advice yet'}
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Right Column - Debug Info and Partial Results */}

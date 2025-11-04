@@ -43,6 +43,7 @@ interface VibeTraderStreamingChartProps {
   onError?: (error: string) => void
   onComplete?: (result: AnalysisResult) => void
   className?: string
+  applyIndicatorsFromStream?: boolean
 }
 
 interface StreamingChartState {
@@ -69,7 +70,8 @@ export function VibeTraderStreamingChart({
   onChartReady,
   onError,
   onComplete,
-  className
+  className,
+  applyIndicatorsFromStream = true
 }: VibeTraderStreamingChartProps) {
   const [chartState, setChartState] = useState<StreamingChartState>({
     isReady: false,
@@ -315,8 +317,8 @@ export function VibeTraderStreamingChart({
   const handleTechnicalUpdate = (technical: TechnicalPartialChunk) => {
     const updates: PendingUpdate[] = []
 
-    // Queue indicator updates
-    if (technical.indicators) {
+    // Queue indicator updates (optional, can be disabled to avoid duplicates)
+    if (applyIndicatorsFromStream && technical.indicators) {
       technical.indicators.forEach(indicator => {
         updates.push({
           type: 'indicator',
