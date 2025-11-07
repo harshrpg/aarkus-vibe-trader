@@ -14,7 +14,6 @@ import dynamic from 'next/dynamic'
 import { useAppDispatch } from '@/lib/store/hooks'
 import { set as setAdvancedMode } from '@/features/advanced-mode/advancedModeSlice'
 import { setSymbol as tvSetSymbol, ready as chartReady, applyMultipleIndicators, clearAllIndicators, removeAllStudies } from '@/lib/tv/bridge'
-import { useChat } from '@ai-sdk/react'
 import { experimental_useObject as useObject } from '@ai-sdk/react'
 import { tradingAdviceSchema } from '@/lib/schema/trading-advice'
 import {
@@ -43,23 +42,6 @@ export default function VibeTraderTestPage() {
     timestamp: Date
     status: 'running' | 'completed' | 'error'
   }>>([])
-
-  // Chat state for sending analysis text to LLM via Vercel AI SDK
-  const { messages, append, status } = useChat({
-    id: 'vibe-trader-test',
-    initialMessages: [
-      {
-        id: 'sys-vibe-indicators',
-        role: 'system',
-        content:
-          'You are the Vibe Trader assistant. For every response, after your analysis, include a concise, machine-readable JSON object on a new line exactly in the form {"indicators":[{"type":"sma","params":{"length":50}}]}. Use these indicator types when appropriate: sma, ema, rsi, macd, bb, ichimoku, vwma, stoch. Choose 3-5 relevant indicators with sensible default params for the symbol/timeframe. Keep prose short.'
-      }
-    ],
-    onError: (error) => {
-      console.error('LLM chat error:', error)
-    },
-    experimental_throttle: 100
-  })
 
   // Structured trading advice via useObject (Zod schema)
   const { submit: submitAdvice, object: adviceObject, isLoading: isAdviceLoading, error: adviceError } = useObject({
@@ -214,10 +196,6 @@ export default function VibeTraderTestPage() {
     }])
 
     // Chart component will trigger streaming; we keep history updates here
-
-    // Also send the analysis text to the LLM via useChat
-    const content = `Symbol: ${symbol}\nRequest: ${query}`
-    append({ role: 'user', content })
 
     // Request structured advice object
     submitAdvice({ symbol, timeframe: '1D', query })
@@ -433,21 +411,6 @@ export default function VibeTraderTestPage() {
               }}
             />
           )}
-
-          {/* LLM Response */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">LLM Response</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-xs text-muted-foreground mb-2">
-                {status === 'submitted' || status === 'streaming' ? 'Generating...' : 'Latest response'}
-              </div>
-              <div className="whitespace-pre-wrap text-sm">
-                {messages.filter(m => m.role === 'assistant').slice(-1)[0]?.content || 'No response yet'}
-              </div>
-            </CardContent>
-          </Card>
 
           {/* Structured Advice (useObject) */}
           <Card>

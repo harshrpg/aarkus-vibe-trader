@@ -13,6 +13,10 @@ import { ChatPanel } from './chat-panel'
 import { useAppSelector } from '@/lib/store/hooks'
 import dynamic from 'next/dynamic'
 import { AdvancedModeState } from '@/types/chatInput'
+import { useVibeTraderStream } from '@/hooks/use-vibe-trader-stream'
+import { experimental_useObject as useObject } from '@ai-sdk/react'
+import { tradingAdviceSchema } from '@/lib/schema/trading-advice'
+import { setSymbol as tvSetSymbol, ready as chartReady, applyMultipleIndicators, clearAllIndicators, removeAllStudies } from '@/lib/tv/bridge'
 
 
 // Define section structure
@@ -70,6 +74,132 @@ export function Chat({
 
   const isLoading = status === 'submitted' || status === 'streaming'
   const advancedModeStoreValue = useAppSelector((s) => s.advancedMode.value);
+  const advancedModeSymbol = useAppSelector((s) => s.advancedMode.symbol);
+
+  // Vibe Trader streaming integration (reused from test interface)
+  const {
+    startStream,
+    partialResults,
+    isStreaming,
+    currentStage,
+    progress
+  } = useVibeTraderStream({
+    onChunkReceived: (chunk) => {
+      if (chunk.type === 'technical_partial' && chunk.data?.indicators?.length) {
+        console.log('[chat] Stream indicators (chunk):', chunk.data.indicators)
+      }
+    },
+    onStatusUpdate: (status) => {
+      console.log('[chat] Stream status:', status.stage, status.progress)
+    },
+    onError: (err) => {
+      console.error('[chat] Stream error:', err)
+    }
+  })
+
+  // Log indicators list from streaming partials
+  useEffect(() => {
+    const indicators = partialResults?.technical?.indicators
+    if (Array.isArray(indicators) && indicators.length > 0) {
+      console.log('[chat] Stream indicators:', indicators)
+    }
+  }, [partialResults?.technical?.indicators])
+
+  // Basic visibility into stream lifecycle
+  useEffect(() => {
+    if (isStreaming) {
+      console.log('[chat] Stream started. Stage:', currentStage, 'Progress:', progress)
+    }
+  }, [isStreaming])
+
+  // Structured trading advice (Zod schema)
+  // const { submit: submitAdvice } = useObject({
+  //   api: '/api/trading-advice',
+  //   id: `advice-${id}`,
+  //   schema: tradingAdviceSchema
+  // })
+  const { submit: submitAdvice, object: adviceObject, isLoading: isAdviceLoading, error: adviceError } = useObject({
+    api: '/api/trading-advice',
+    id: 'vibe-trader-advice',
+    schema: tradingAdviceSchema
+  })
+
+  // Log technical indicators from structured advice
+  useEffect(() => {
+    console.log(adviceObject)
+    console.log(isAdviceLoading)
+    console.log(adviceError)
+    const indicators = adviceObject?.technical?.indicators
+    if (Array.isArray(indicators) && indicators.length > 0) {
+      console.log('Structured advice indicators:', indicators)
+      alert('advice loaded')
+    }
+  }, [adviceObject])
+  // Normalize indicator names/params from advice for TradingView studies
+  const normalizeIndicator = (ind: any) => {
+    const nameRaw = String(ind?.name || '').toLowerCase()
+    const params = (ind?.parameters || {}) as Record<string, any>
+    switch (nameRaw) {
+      case 'sma':
+        return { name: 'Moving Average', parameters: { length: params.length ?? 20 }, visible: true }
+      case 'ema':
+        return { name: 'Moving Average Exponential', parameters: { length: params.length ?? 20 }, visible: true }
+      case 'rsi':
+        return { name: 'Relative Strength Index', parameters: { length: params.length ?? 14 }, visible: true }
+      case 'macd':
+        return {
+          name: 'MACD',
+          parameters: {
+            in_0: params.fast ?? params.in_0 ?? 12,
+            in_1: params.slow ?? params.in_1 ?? 26,
+            in_2: params.signal ?? params.in_2 ?? 9,
+            in_3: params.source ?? params.in_3 ?? 'close'
+          },
+          visible: true
+        }
+      case 'bb':
+      case 'bollinger':
+      case 'bollinger_bands':
+        return { name: 'Bollinger Bands', parameters: { length: params.length ?? 20, mult: params.stdDev ?? params.mult ?? 2 }, visible: true }
+      case 'stoch':
+      case 'stochastic':
+        return { name: 'Stochastic', parameters: { k: params.k ?? 14, d: params.d ?? 3 }, visible: true }
+      case 'vwma':
+        return { name: 'VWMA', parameters: { length: params.length ?? 20 }, visible: true }
+      case 'ichimoku':
+      case 'ichimoku_cloud':
+        return { name: 'Ichimoku Cloud', parameters: params, visible: true }
+      default:
+        return { name: ind?.name ?? 'Moving Average', parameters: params, visible: true }
+    }
+  }
+
+  // Apply indicators to TradingView when structured advice arrives
+  useEffect(() => {
+    const indicators = adviceObject?.technical?.indicators
+    if (!Array.isArray(indicators) || indicators.length === 0) return
+
+      ; (async () => {
+        try {
+          await chartReady
+          // Clear any existing indicators/studies (bridge + any others)
+          await removeAllStudies()
+          await clearAllIndicators()
+          // Deduplicate by normalized study name
+          const seen = new Set<string>()
+          const configs = indicators
+            .map(normalizeIndicator)
+            .filter(cfg => {
+              if (seen.has(cfg.name)) return false
+              seen.add(cfg.name)
+              return true
+            })
+          await applyMultipleIndicators(configs)
+        } catch (e) {
+          console.error('Failed to apply indicators from advice:', e)
+        }
+      })()
+  }, [adviceObject])
 
   // Convert messages array to sections array
   const sections = useMemo<ChatSection[]>(() => {
@@ -203,7 +333,20 @@ export function Chat({
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setData(undefined)
+    // Snapshot current input before it changes
+    const currentInput = input?.trim()
     handleSubmit(e)
+    // If advanced mode is enabled and we have a symbol & prompt, start streaming + structured advice
+    if (advancedModeStoreValue && advancedModeSymbol && currentInput) {
+      try {
+        // Fire-and-forget streaming analysis
+        // startStream(advancedModeSymbol, '1D', currentInput)
+        // Request structured advice object
+        submitAdvice({ symbol: advancedModeSymbol, timeframe: '1D', query: currentInput })
+      } catch (err) {
+        console.error('Failed to start vibe trader stream or advice:', err)
+      }
+    }
   }
 
   useEffect(() => {
