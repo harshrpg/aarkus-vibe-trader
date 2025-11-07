@@ -113,7 +113,7 @@ socket.addEventListener('error', (error) => {
 socket.addEventListener('message', (event) => {
     try {
         const data = JSON.parse(event.data as string);
-        console.log('[socket] Message: ', data);
+        // console.log('[socket] Message: ', data);
 
         if (data?.MESSAGE === 'INVALID_PARAMETER' || data?.s === 'error') {
             console.warn('[socket] Error message from server:', data);
@@ -141,7 +141,7 @@ socket.addEventListener('message', (event) => {
                 low: tradePrice,
                 close: tradePrice,
             };
-            console.log('[socket] Generate new bar', bar);
+            // console.log('[socket] Generate new bar', bar);
         } else {
             bar = {
                 ...lastDailyBar,
@@ -149,7 +149,7 @@ socket.addEventListener('message', (event) => {
                 low: Math.min(lastDailyBar.low, tradePrice),
                 close: tradePrice,
             };
-            console.log('[socket] Update the latest bar by price', tradePrice);
+            // console.log('[socket] Update the latest bar by price', tradePrice);
         }
         subscriptionItem.lastDailyBar = bar;
         subscriptionItem.handlers.forEach((handler) => handler.callback(bar));

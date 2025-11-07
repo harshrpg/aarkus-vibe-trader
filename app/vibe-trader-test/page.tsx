@@ -13,7 +13,7 @@ import { Separator } from '@/components/ui/separator'
 import dynamic from 'next/dynamic'
 import { useAppDispatch } from '@/lib/store/hooks'
 import { set as setAdvancedMode } from '@/features/advanced-mode/advancedModeSlice'
-import { setSymbol as tvSetSymbol, ready as chartReady, applyMultipleIndicators, clearAllIndicators } from '@/lib/tv/bridge'
+import { setSymbol as tvSetSymbol, ready as chartReady, applyMultipleIndicators, clearAllIndicators, removeAllStudies } from '@/lib/tv/bridge'
 import { useChat } from '@ai-sdk/react'
 import { experimental_useObject as useObject } from '@ai-sdk/react'
 import { tradingAdviceSchema } from '@/lib/schema/trading-advice'
@@ -123,7 +123,8 @@ export default function VibeTraderTestPage() {
       ; (async () => {
         try {
           await chartReady
-          // Clear any previous indicators for a clean state
+          // Clear any existing indicators/studies (bridge + any others)
+          await removeAllStudies()
           await clearAllIndicators()
           // Deduplicate by normalized study name
           const seen = new Set<string>()

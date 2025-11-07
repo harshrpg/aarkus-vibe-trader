@@ -295,7 +295,7 @@ export function ChatPanel({
                   >
                     {isLoading ? <Square size={20} /> : <ArrowUp size={20} />}
                   </Button>
-                  <Button onClick={() => testAddingMacdOnWebsite()}>Add Macd</Button>
+                  {/* <Button onClick={() => testAddingMacdOnWebsite()}>Add Macd</Button> */}
                 </div>
               </div>
             </div>

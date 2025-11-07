@@ -224,6 +224,22 @@ export async function clearAllIndicators(): Promise<void> {
 }
 
 /**
+ * Remove all studies/indicators from the chart, including ones not added via this bridge.
+ * Uses Charting Library API if available.
+ */
+export async function removeAllStudies(): Promise<void> {
+    await ready;
+    if (!chartRef) return;
+    try {
+        // Call underlying Charting Library API (not typed), if present
+        (chartRef as any)?.removeAllStudies?.();
+    } catch (error) {
+        console.error('Failed to remove all studies:', error);
+    }
+    appliedIndicators.clear();
+}
+
+/**
  * Apply Moving Average with optimized parameters
  */
 export async function addMovingAverage(period: number = 20, type: 'SMA' | 'EMA' = 'SMA'): Promise<any> {

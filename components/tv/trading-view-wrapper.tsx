@@ -6,6 +6,8 @@ import { registerWidget } from "@/lib/tv/bridge";
 import { loadScript, loadCSS } from "@/lib/tv/utils";
 import { IChartingLibraryWidget, IChartWidgetApi } from "@/public/charting_library/charting_library";
 import { useEffect, useRef, useState } from "react";
+import { Spinner } from "../ui/spinner";
+import LoadingComponents from "../complex-components/ui/loading-component";
 
 // Global state to track script loading
 let scriptsLoaded = false;
@@ -56,8 +58,10 @@ const TradingViewWrapper = () => {
         const initWidget = async () => {
             try {
                 if (!isMounted) return;
+                console.log('[trading-view-wrapper] initializing widget');
 
                 await loadScripts();
+                console.log('[trading-view-wrapper] Checking if container reference exists: ', containerRef.current);
 
                 if (!isMounted || !containerRef.current) return;
 
@@ -147,7 +151,12 @@ const TradingViewWrapper = () => {
             position: 'relative',
             backgroundColor: '#000'
         }}>
-            <div ref={containerRef} style={{ width: '100%', height: '100%' }}></div>
+            <div ref={containerRef} id="tradingview_widget" style={{ width: '100%', height: '100%' }}></div>
+            {isLoading && (
+                <div className="w-full h-full absolute inset-0">
+                    <LoadingComponents componentName={'Trading View Chart'} />
+                </div>
+            )}
         </div>
     );
 };
