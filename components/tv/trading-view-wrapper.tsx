@@ -2,7 +2,7 @@
 
 import { useAppSelector } from "@/lib/store/hooks";
 import Datafeed from "@/lib/tradingview/datafeed";
-import { registerWidget } from "@/lib/tv/bridge";
+import { registerWidget, setSymbol as setChartSymbol, unregisterWidget } from "@/lib/tv/bridge";
 import { loadScript, loadCSS } from "@/lib/tv/utils";
 import { IChartingLibraryWidget, IChartWidgetApi } from "@/public/charting_library/charting_library";
 import { useEffect, useRef, useState } from "react";
@@ -123,8 +123,21 @@ const TradingViewWrapper = () => {
             if (widget && typeof widget.remove === 'function') {
                 widget.remove();
             }
+            unregisterWidget();
         };
     }, []); // Empty dependency array to run only once
+
+    // Update chart symbol when global store symbol changes
+    useEffect(() => {
+        if (!symbol) return;
+        (async () => {
+            try {
+                await setChartSymbol(symbol);
+            } catch (e) {
+                console.error('[trading-view-wrapper] Failed to update symbol on chart: ', e);
+            }
+        })();
+    }, [symbol]);
 
     if (error) {
         return (
