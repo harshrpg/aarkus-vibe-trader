@@ -4,7 +4,7 @@ import { CHAT_ID } from '@/lib/constants'
 import { Model } from '@/lib/types/models'
 import { cn } from '@/lib/utils'
 import { useChat } from '@ai-sdk/react'
-import { ChatRequestOptions } from 'ai'
+import { ChatRequestOptions, JSONValue } from 'ai'
 import { Message } from 'ai/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
@@ -41,6 +41,14 @@ export function Chat({
 }) {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const [isAtBottom, setIsAtBottom] = useState(true)
+  const [adviceIndicatorsSet, setAdviceIndicatorsSet] = useState<Set<string>>(new Set())
+
+  // Structured trading advice (Zod schema)
+  const { submit: submitAdvice, object: adviceObject, isLoading: isAdviceLoading, error: adviceError } = useObject({
+    api: '/api/trading-advice',
+    id: 'vibe-trader-advice',
+    schema: tradingAdviceSchema
+  })
 
   const {
     messages,
@@ -59,7 +67,22 @@ export function Chat({
     initialMessages: savedMessages,
     id: CHAT_ID,
     body: {
-      id
+      id,
+      // Include latest unique advice indicators in the chat request body context
+      adviceIndicators: useMemo(() => {
+        const indicators = adviceObject?.technical?.indicators
+        if (!Array.isArray(indicators)) return []
+        const seen = new Set<string>()
+        const unique = []
+        for (const ind of indicators) {
+          const name = String(ind?.name || '').toLowerCase()
+          if (seen.has(name)) continue
+          seen.add(name)
+          unique.push({ name, parameters: ind?.parameters ?? {} })
+        }
+        return unique
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, [adviceObject])
     },
     onFinish: () => {
       window.history.replaceState({}, '', `/search/${id}`)
@@ -112,27 +135,17 @@ export function Chat({
     }
   }, [isStreaming])
 
-  // Structured trading advice (Zod schema)
-  // const { submit: submitAdvice } = useObject({
-  //   api: '/api/trading-advice',
-  //   id: `advice-${id}`,
-  //   schema: tradingAdviceSchema
-  // })
-  const { submit: submitAdvice, object: adviceObject, isLoading: isAdviceLoading, error: adviceError } = useObject({
-    api: '/api/trading-advice',
-    id: 'vibe-trader-advice',
-    schema: tradingAdviceSchema
-  })
+  // Structured trading advice (already initialized above)
 
   // Log technical indicators from structured advice
   useEffect(() => {
-    console.log(adviceObject)
-    console.log(isAdviceLoading)
-    console.log(adviceError)
+    // console.log(adviceObject)
+    // console.log(isAdviceLoading)
+    // console.log(adviceError)
     const indicators = adviceObject?.technical?.indicators
     if (Array.isArray(indicators) && indicators.length > 0) {
       console.log('Structured advice indicators:', indicators)
-      alert('advice loaded')
+      // alert('advice loaded')
     }
   }, [adviceObject])
   // Normalize indicator names/params from advice for TradingView studies
@@ -185,15 +198,20 @@ export function Chat({
           // Clear any existing indicators/studies (bridge + any others)
           await removeAllStudies()
           await clearAllIndicators()
-          // Deduplicate by normalized study name
-          const seen = new Set<string>()
-          const configs = indicators
-            .map(normalizeIndicator)
-            .filter(cfg => {
-              if (seen.has(cfg.name)) return false
-              seen.add(cfg.name)
-              return true
-            })
+          // Normalize and deduplicate by study name using a Set for uniqueness
+          const uniqueNames = new Set<string>()
+          const configByName = new Map<string, { name: string; parameters: Record<string, any>; visible: boolean }>()
+          for (const ind of indicators) {
+            const cfg = normalizeIndicator(ind)
+            if (!uniqueNames.has(cfg.name)) {
+              uniqueNames.add(cfg.name)
+              configByName.set(cfg.name, cfg)
+            }
+          }
+          console.log('[chat] unique indicators')
+          // Expose the unique indicator names set for any other consumers
+          setAdviceIndicatorsSet(uniqueNames)
+          const configs = Array.from(configByName.values())
           await applyMultipleIndicators(configs)
         } catch (e) {
           console.error('Failed to apply indicators from advice:', e)
@@ -335,7 +353,32 @@ export function Chat({
     setData(undefined)
     // Snapshot current input before it changes
     const currentInput = input?.trim()
-    handleSubmit(e)
+    // Prepare unique advice indicators to include with this request
+    const adviceIndicatorsData: JSONValue = (() => {
+      const indicators = adviceObject?.technical?.indicators
+      if (!Array.isArray(indicators)) return []
+      const seen = new Set<string>()
+      const unique: Array<{ name: string; parameters: Record<string, string | number | boolean> }> = []
+      for (const ind of indicators) {
+        const name = String(ind?.name || '').toLowerCase()
+        if (seen.has(name)) continue
+        seen.add(name)
+        const rawParams = (ind as any)?.parameters ?? {}
+        const pruned: Record<string, string | number | boolean> = {}
+        for (const [k, v] of Object.entries(rawParams)) {
+          if (['string', 'number', 'boolean'].includes(typeof v)) {
+            pruned[k] = v as string | number | boolean
+          }
+        }
+        unique.push({ name, parameters: pruned })
+      }
+      return unique
+    })()
+    handleSubmit(e, {
+      data: {
+        adviceIndicators: adviceIndicatorsData
+      }
+    })
     // If advanced mode is enabled and we have a symbol & prompt, start streaming + structured advice
     if (advancedModeStoreValue && advancedModeSymbol && currentInput) {
       try {

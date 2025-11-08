@@ -84,7 +84,7 @@ export default async function RootLayout({
             <SidebarProvider defaultOpen>
               <AppSidebar />
               <div className="flex flex-col flex-1">
-                <Header user={user} />
+                {/* <Header user={user} /> */}
                 <main className="flex flex-1 min-h-0">
                   <ArtifactRoot>{children}</ArtifactRoot>
                 </main>
