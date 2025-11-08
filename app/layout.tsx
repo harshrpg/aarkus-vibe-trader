@@ -17,12 +17,12 @@ const fontSans = FontSans({
   variable: '--font-sans'
 })
 
-const title = 'Morphic'
+const title = 'Agent Dexx'
 const description =
-  'A fully open-source AI-powered answer engine with a generative UI.'
+  'Trading agentic assistant.'
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://morphic.sh'),
+  metadataBase: new URL('https://agentdexx.ai'),
   title,
   description,
   openGraph: {

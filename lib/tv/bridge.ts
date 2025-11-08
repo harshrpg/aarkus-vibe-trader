@@ -127,7 +127,12 @@ export async function addMACD(params?: Record<string, any>) {
 
 export async function setSymbol(symbol: string, interval: string = "1D") {
     await ready;
-    await chartRef?.setSymbol(symbol, interval);
+    // New Charting Library API expects options/callback as 2nd arg; interval must be set via setResolution.
+    if (!chartRef) return;
+    await chartRef.setSymbol(symbol);
+    if (interval) {
+        await chartRef.setResolution(interval as any);
+    }
 }
 
 export async function addRSI(length = 14) {
@@ -386,7 +391,7 @@ export async function drawTrendLine(
     const shape = chartRef.createShape(
         { time: startPoint.time, price: startPoint.price },
         {
-            shape: 'trend_line',
+            shape: 'horizontal_line',
             overrides: lineStyle,
             text: label || ''
         }
@@ -857,7 +862,7 @@ export async function createDynamicPriceTargets(
 function getPriceTargetStyle(targetType: PriceTarget['type'], confidence: number): StyleConfig {
     const baseStyle: StyleConfig = {
         lineWidth: Math.max(1, Math.min(3, Math.floor(confidence * 3))),
-        lineStyle: confidence > 0.7 ? 0 : 1, // Solid for high confidence, dashed for low
+        // lineStyle: confidence > 0.7 ? 0 : 1, // Solid for high confidence, dashed for low
     };
 
     const styleMap: Record<PriceTarget['type'], Partial<StyleConfig>> = {
@@ -932,7 +937,7 @@ export async function addPriceTargetTooltip(
     const tooltip = chartRef.createShape(
         { time: position.time, price: position.price },
         {
-            shape: 'callout',
+            shape: 'flag',
             text: `${formatPriceTargetLabel(target)}\n\nReasoning:\n${target.reasoning}`,
             overrides: {
                 color: '#333333',
