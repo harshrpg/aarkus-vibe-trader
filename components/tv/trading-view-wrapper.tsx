@@ -165,6 +165,18 @@ const TradingViewWrapper = () => {
             backgroundColor: '#000'
         }}>
             <div ref={containerRef} id="tradingview_widget" style={{ width: '100%', height: '100%' }}></div>
+            <div className="absolute bottom-3 left-3 z-10 rounded-md bg-black/60 px-3 py-1 text-xs text-white">
+                This chart is powered by{' '}
+                <a
+                    href="https://www.tradingview.com"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline underline-offset-2 hover:text-white/90"
+                >
+                    TradingView
+                </a>
+                , the go-to charting library, embraced by millions of traders.
+            </div>
             {isLoading && (
                 <div className="w-full h-full absolute inset-0">
                     <LoadingComponents componentName={'Trading View Chart'} />
